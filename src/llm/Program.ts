@@ -151,8 +151,64 @@ export function initProgramState(canvasEl: HTMLCanvasElement, fontAtlasData: IFo
         vocabSize: 129280,
     };
 
+    // Kimi K2.6（规模示意）：61 层、隐藏维度 7168、64 个注意力头、词表 163840、
+    // MoE（384 路由专家 / 8 激活 + 1 共享）。渲染器没有 MoE/MLA 概念，仅作稠密骨架的规模示意。
+    // T 取 1024 为渲染折中（真实上下文 256K）。
+    let kimiShape: IModelShape = {
+        B: 1,
+        T: 1024,
+        C: 7168,
+        nHeads: 64,
+        A: 7168 / 64,
+        nBlocks: 61,
+        vocabSize: 163840,
+    };
+
+    // Qwen3-235B-A22B（规模示意）：94 层、隐藏维度 4096、32 个注意力头、词表 151936、
+    // MoE（128 专家 / 8 激活）。同上，仅作稠密骨架的规模示意。T 取 1024 为渲染折中。
+    let qwenShape: IModelShape = {
+        B: 1,
+        T: 1024,
+        C: 4096,
+        nHeads: 32,
+        A: 4096 / 32,
+        nBlocks: 94,
+        vocabSize: 151936,
+    };
+
+    // Llama 4 Maverick（规模示意）：48 层、隐藏维度 5120、40 个注意力头、词表 202048、
+    // MoE（128 专家 / 1 激活）。同上，仅作稠密骨架的规模示意。T 取 1024 为渲染折中。
+    let llamaShape: IModelShape = {
+        B: 1,
+        T: 1024,
+        C: 5120,
+        nHeads: 40,
+        A: 5120 / 40,
+        nBlocks: 48,
+        vocabSize: 202048,
+    };
+
     function makeCamera(center: Vec3, angle: Vec3): ICameraPos {
         return { center, angle };
+    }
+
+    // 根据布局的实际包围盒，自动推算能框住整个模型块的相机位姿。
+    // 3D 块的立方坐标在局部空间（未含 offset），渲染时再由 example.offset 平移，
+    // 因此相机中心点 = 局部包围盒中心 + offset。
+    function fitCameraFor(shape: IModelShape, offset: Vec3): ICameraPos {
+        let layout = genGptModelLayout(shape, null, new Vec3());
+        let mn = new Vec3(1e30, 1e30, 1e30);
+        let mx = new Vec3(-1e30, -1e30, -1e30);
+        for (let c of layout.cubes) {
+            mn = new Vec3(Math.min(mn.x, c.x), Math.min(mn.y, c.y), Math.min(mn.z, c.z));
+            mx = new Vec3(Math.max(mx.x, c.x + c.dx), Math.max(mx.y, c.y + c.dy), Math.max(mx.z, c.z + c.dz));
+        }
+        let center = mn.add(mx).mul(0.5).add(offset);
+        let size = mx.sub(mn);
+        let diag = Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z);
+        // dist = 200 * angle.z，取约 0.75 倍对角距离，可完整框住整块
+        let angleZ = (diag * 0.75) / 200;
+        return { center, angle: new Vec3(238.959, 10.501, angleZ) };
     }
 
     let delta = new Vec3(10000, 0, 0);
@@ -195,13 +251,14 @@ export function initProgramState(canvasEl: HTMLCanvasElement, fontAtlasData: IFo
             blockRender: initBlockRender(render?.ctx ?? null),
             camera: makeCamera(new Vec3(237902.688, 0.000, -47282.484), new Vec3(311.959, 23.501, 1382.449)),
         }, {
+            // GPT-3：已恢复显示（之前为 enabled:false）。相机由布局包围盒自动推算。
             name: 'GPT-3',
-            enabled: false,
+            enabled: true,
             shape: gpt3Shape,
             offset: delta.mul(50.0),
             modelCardOffset: delta.mul(15.0),
             blockRender: initBlockRender(render?.ctx ?? null),
-            camera: makeCamera(new Vec3(837678.163, 0.000, -485242.286), new Vec3(238.959, 10.501, 12583.939)),
+            camera: fitCameraFor(gpt3Shape, delta.mul(50.0)),
         }, {
             // DeepSeek-V3 规模示意（相机数值由该形状的实际包围盒推算得出）
             name: 'DeepSeek-V3（规模示意）',
@@ -211,6 +268,33 @@ export function initProgramState(canvasEl: HTMLCanvasElement, fontAtlasData: IFo
             modelCardOffset: delta.mul(0.5),
             blockRender: initBlockRender(render?.ctx ?? null),
             camera: makeCamera(new Vec3(225120.122, -12190.841, -377665.139), new Vec3(238.959, 10.501, 6929.409)),
+        }, {
+            // Kimi K2.6 规模示意：相机由布局包围盒自动推算
+            name: 'Kimi K2.6（规模示意）',
+            enabled: true,
+            shape: kimiShape,
+            offset: delta.mul(80.0),
+            modelCardOffset: delta.mul(0.5),
+            blockRender: initBlockRender(render?.ctx ?? null),
+            camera: fitCameraFor(kimiShape, delta.mul(80.0)),
+        }, {
+            // Qwen3-235B-A22B 规模示意：相机由布局包围盒自动推算
+            name: 'Qwen3-235B-A22B（规模示意）',
+            enabled: true,
+            shape: qwenShape,
+            offset: delta.mul(110.0),
+            modelCardOffset: delta.mul(0.5),
+            blockRender: initBlockRender(render?.ctx ?? null),
+            camera: fitCameraFor(qwenShape, delta.mul(110.0)),
+        }, {
+            // Llama 4 Maverick 规模示意：相机由布局包围盒自动推算
+            name: 'Llama 4 Maverick（规模示意）',
+            enabled: true,
+            shape: llamaShape,
+            offset: delta.mul(140.0),
+            modelCardOffset: delta.mul(0.5),
+            blockRender: initBlockRender(render?.ctx ?? null),
+            camera: fitCameraFor(llamaShape, delta.mul(140.0)),
         }],
         gptGpuModel: null,
         jsGptModel: null,
