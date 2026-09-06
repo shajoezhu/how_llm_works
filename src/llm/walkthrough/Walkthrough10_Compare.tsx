@@ -3,6 +3,7 @@ import { Phase } from "./Walkthrough";
 import { commentary, embed, IWalkthroughArgs, phaseTools, setInitialCamera } from "./WalkthroughTools";
 import s from './Walkthrough.module.scss';
 import { Vec3 } from '@/src/utils/vector';
+import { ArchDiagram, ModelOverviewTable, ScaleBars } from "@/src/llm/components/ModelComparison";
 
 let v3PaperLink = 'https://arxiv.org/abs/2412.19437';
 let r1PaperLink = 'https://arxiv.org/abs/2501.12948';
@@ -120,8 +121,45 @@ _一个重要的说明：3D 场景里的 DeepSeek 并不真实_
 这是渲染器的能力边界，而不是 DeepSeek 的真实架构。场景里那个模型的序列长度显示为 1024
 （真实上下文是 128K），同样是出于渲染性能的折中。
 
-想深入了解，推荐阅读 ${embedLink('DeepSeek-V3 技术报告', v3PaperLink)}
+    想深入了解，推荐阅读 ${embedLink('DeepSeek-V3 技术报告', v3PaperLink)}
 和 ${embedLink('官方代码仓库', deepSeekRepoLink)}。
+`;
+
+    breakAfter();
+
+    commentary(wt)`
+_把视野拉宽：看看当下的四大主流前沿模型_
+
+前面我们比较了 nano-gpt 与 DeepSeek-V3。下面把视野拉宽，看看当下四个主流前沿模型——
+它们有的开源、有的闭源，体量和处理长度都远超玩具模型：${embed(ModelOverviewTable)}
+
+一个关键点：真实前沿模型普遍采用 _MoE 稀疏架构_（DeepSeek、Kimi），上下文窗口从 128K 一路拉到 2M；
+而 GPT-5.6、Claude Opus 4.6、Gemini 3.1 Pro 作为闭源模型，参数量并未公开。
+`;
+
+    breakAfter();
+
+    commentary(wt)`
+_体量：差了 4~5 个数量级_
+
+${embed(ScaleBars)}
+
+注意 nano-gpt 只有 8.5 万参数，而 DeepSeek / Kimi 是百亿到万亿级别——这正是"玩具"与"前沿"之间的体量鸿沟。
+上下文长度同理：从 6 个字母扩展到百万级 token。闭源三家的参数量未公开，故条形图中不显示。
+`;
+
+    breakAfter();
+
+    commentary(wt)`
+_架构：稠密 vs 稀疏 MoE_
+
+${embed(ArchDiagram)}
+
+nano-gpt 是 _稠密_ 模型：每个 token 都要经过全部参数。DeepSeek-V3 与 Kimi K2.6 则用 _MoE_——
+总参数能装下海量知识，但每个 token 只激活极小一部分（如 Kimi：384 个专家里只选 8 个 + 1 个共享专家），
+因此"大而不贵"。闭源三家的内部架构未公开，但同样普遍采用 MoE 已是业界共识。
+
+（以上数据来自 2026-09 的网络检索，仅用于直观感受，具体数值会随厂商更新而变动。）
 `;
 
     breakAfter();

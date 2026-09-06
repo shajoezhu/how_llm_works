@@ -9,7 +9,7 @@ export const Header: React.FC<{
         <div className="flex items-center">{children}</div>
         {title && <div className="text-xl">{title}</div>}
         <div className="hover:underline">
-            <a href="https://shajoezhu.github.io/">Home</a>
+            <a href="https://github.com/shajoezhu">Home</a>
         </div>
     </div>;
 
