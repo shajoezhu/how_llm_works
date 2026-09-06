@@ -1,6 +1,7 @@
 import React from 'react';
 import { LayerView } from '@/src/llm/LayerView';
 import { InfoButton } from '@/src/llm/WelcomePopup';
+import { CostMeterHud } from '@/src/llm/components/CostMeterHud';
 
 export const metadata = {
   title: 'LLM 可视化',
@@ -15,6 +16,7 @@ export default function Page() {
             <InfoButton />
         </Header>
         <LayerView />
+        <CostMeterHud />
         <div id="portal-container"></div>
         <footer style={{
             position: 'fixed',

@@ -3,6 +3,7 @@ import { NativeFunctions, TensorType } from "./NativeBindings";
 import { makeArray } from "@/src/utils/data";
 import { createBufferTex as createBufferTex2, IBufferTex, writeToBufferTex } from "@/src/utils/renderPhases";
 import { IGptModelConfig, ITensorSet, TensorF32 } from "@/src/utils/tensor";
+import { costMeter } from "./CostMeter";
 
 function createBufferTex(gl: WebGL2RenderingContext, height: number, width: number, channels: number) {
     return createBufferTex2(gl, width, height, channels);
@@ -190,6 +191,9 @@ export function constructModel(model: ITensorSet, config: IGptModelConfig, nativ
         let sw = performance.now();
         native.runModel(nativeModel);
         console.log('runModel', (performance.now() - sw).toFixed(2) + 'ms');
+        // 初始前向：输入 6 个 token（上下文窗口为 11，其余为填充）
+        costMeter.reset();
+        costMeter.addForward(6);
     }
 
     return {
@@ -221,6 +225,9 @@ export function stepWasmModel(wasmModel: IWasmGptModel, jsModel: IGptModelLink) 
     jsModel.inputLen += 1;
 
     native.runModel(modelPtr);
+
+    // 每生成 1 个新 token，模型都要把当前整个上下文（inputLen 个已存在 token）重新过一遍网络
+    costMeter.addForward(jsModel.inputLen);
 
     wasmModel.intersDirty = true;
 

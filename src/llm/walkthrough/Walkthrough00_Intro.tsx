@@ -13,6 +13,9 @@ import { lerp } from "@/src/utils/math";
 import { drawDependences } from "../Interaction";
 import { drawDataFlow } from "../components/DataFlow";
 
+// 记录 intro 这次播放里已经自动生成了几个 token（保证每次播放只生成一次）
+const genState = new WeakMap<object, { genSteps: number }>();
+
 /*
 We're mostly on the right track here I think.
 
@@ -72,6 +75,14 @@ export function walkthroughIntro(args: IWalkthroughArgs) {
 把真实大语言模型内部的机制——_词嵌入_、_自注意力_ 如何混合信息、又是如何一个字一个字地自回归预测——
 用肉眼可见的方式讲清楚。排序只是一个便于理解的"载体任务"；
 而模型偶尔会犯错这一点，恰恰说明它学到的只是规律，而非真正的规则。`;
+
+    commentary(wt, c0)`你也许会想：就排这么一小串字母，到底要花多少钱？请留意页面左下角的 _成本计数器_。
+
+这个模型只有 85,000 个参数，每"跑一遍"的花费微乎其微。但关键在于它用的是 _自回归_ 方式：
+每预测出 1 个新字母，就要把当前已存在的所有字母（最多 11 个的上下文窗口）重新完整地过一遍网络。
+
+所以成本并不取决于"结果有几个字母"，而取决于"模型为得到结果，反复处理了多少 token"。
+这正是真实大语言模型按 token 计费的本质：_token 越多，花费越高_——下面你会亲眼看到计数器一路往上跳。`;
 
     if (c0.t > 0) {
         for (let cube of layout.cubes) {
@@ -234,7 +245,39 @@ export function walkthroughIntro(args: IWalkthroughArgs) {
         'A'、'B' 或 'C' 的概率。`
 
     commentary(wt)`在这个例子中，模型相当确信下一个词元会是 'A'。现在，我们可以将这一预测反馈回模型的顶部，并重复
-    整个过程。`;
+    整个过程。
+
+    注意：每一次"重复"，模型都要把当前所有词元重新算一遍——这正是左下角 _成本计数器_ 里"前向计算次数"和"已处理 token"往上跳的原因。
+    你生成的字母越多，它要反复处理的 token 就越多，花费也就越高。`;
+
+    // 自动演示自回归生成：依次生成 token，让左下角的成本计数器可见地往上跳
+    {
+        let g = genState.get(wt) ?? { genSteps: 0 };
+        if (wt.time === 0) {
+            g.genSteps = 0;
+        }
+        genState.set(wt, g);
+
+        let maxSteps = 5; // 上下文从 6 个 token 补到 11 个（窗口上限）
+        let times: ITimeInfo[] = [];
+        let prev: ITimeInfo | null = null;
+        for (let i = 0; i < maxSteps; i++) {
+            let t = afterTime(prev, 0.8, 0.4);
+            times.push(t);
+            prev = t;
+        }
+        for (let i = 0; i < maxSteps; i++) {
+            let t = times[i];
+            if (t.active && g.genSteps <= i) {
+                state.stepModel = true;
+                g.genSteps = i + 1;
+            }
+        }
+    }
+
+    commentary(wt)`看左下角的 _成本计数器_：随着每个新字母被生成，"前向计算次数"和"已处理 token"都在增加——
+    计数器从 6 token / 1 次前向 一路涨到约 51 token / 6 次前向（每多生成 1 个字母，就多处理 7、8、9、10、11 个 token——因为上下文在不断变长）。
+    这正是真实大语言模型"按 token 计费"的直观体现。你也可以在右侧边栏点 _Step_ 手动继续生成。`;
 
     breakAfter();
 }
